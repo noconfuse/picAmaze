@@ -1,0 +1,15 @@
+{
+  "name": "canvas_crop",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "test": "node app.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.15.4",
+    "path": "^0.12.7"
+  }
+}

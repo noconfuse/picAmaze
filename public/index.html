@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>canvas裁剪图片</title>
+	<script src="https://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
+	<style>
+		.container {
+			width: 60%;
+			margin: 0 auto;
+			height: ;
+			position: relative;
+		}
+		.overlay {
+			width: 15%;
+			height: 60%;
+			overflow: hidden;
+			/*position: absolute;*/
+			border: 2px dotted #ccc;
+		}
+		.overlay img {
+			position: relative;
+			left: 0;
+		}
+
+	</style>
+</head>
+<body>
+	<div class="container">
+		<div class="overlay">
+			<img src="123.jpg" alt="原图" class="resize-crop" draggable="false">
+		</div>
+	</div>
+	<button class="crop">裁剪</button>
+	<div class="preview">
+		<img src="" alt="" class="created_img">
+	</div>
+	<script>
+		$('.resize-crop').wrap('<div class="resize-container"></div>');
+		$('.resize-crop').on('mouseenter',function(e){
+			this.style.cursor = "move";
+		})
+
+		var crop_left = getStyle($('.resize-crop')[0],'left'),//裁剪起始点
+			crop_top = getStyle($('.resize-crop')[0],'top');
+		$('.resize-crop').on('mousedown',function(e){
+			var startPoint_x = e.clientX;
+			var startPoint_y = e.clientY;
+			var numL = parseInt(window.getComputedStyle(this,null)['left']);
+			var numT = parseInt(window.getComputedStyle(this,null)['top']);
+			$('.resize-crop').on('mousemove',function(e){
+				this.style.left = numL + e.clientX - startPoint_x+"px";
+				this.style.top = numT + e.clientY - startPoint_y+"px";
+				var num1   = parseInt(this.style.left);
+				if(num1 >= 0){
+					this.style.left = 0
+				}else if(num1 <=  this.parentNode.offsetWidth - this.offsetWidth){
+					this.style.left = this.parentNode.offsetWidth - this.offsetWidth+'px'
+				}
+				var num2 = parseInt(this.style.top);
+				if(num2 >= 0){
+					this.style.top = 0
+				}else if(num2 <=  this.parentNode.offsetHeight - this.offsetHeight){
+					this.style.top = this.parentNode.offsetHeight - this.offsetHeight+'px'
+				}
+			})
+			$('.resize-crop').on('mouseup',function(){
+				crop_left = getStyle(this,'left');
+				crop_top = getStyle(this,'top');
+				$('.resize-crop').off('mousemove')
+			})
+		})
+		var canvas1 = document.createElement('canvas');
+		var cxt1 = canvas1.getContext('2d');
+		var img = new Image();
+		img.src = $('.resize-crop').attr('src');
+		img.onload = function(){
+			canvas1.width = $('.resize-crop').width();
+			canvas1.height = $('.resize-crop').height();
+			cxt1.drawImage(img,0,0);
+		}
+		function crop(){
+			//获取容器的宽高
+			width = $('.overlay').width();
+			height = $('.overlay').height();
+			var dataImg = cxt1.getImageData(crop_left,crop_top,width,height)//得到裁剪的图片
+			var canvas2 = document.createElement('canvas');
+			canvas2.width = width;
+			canvas2.height = height;
+			var cxt2 = canvas2.getContext('2d');
+			cxt2.putImageData(dataImg,0,0,0,0,width,height);
+			var created_img = canvas2.toDataURL("image/png");
+			console.log(dataImg)
+			console.log(created_img)
+			// $('.preview').append(canvas2)
+			$('.created_img').attr('src',created_img)
+		}
+		function getStyle(dom,attr){
+			if(document.currentStyle){
+				return parseInt(dom.currentStyle.attr)
+			}else if(window.getComputedStyle){
+				return parseInt(window.getComputedStyle(dom,null)[attr])
+			}
+		}
+		$('.crop').on('click',crop)
+
+
+
+
+
+
+
+	</script>
+</body>
+</html>
