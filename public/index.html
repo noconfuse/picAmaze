@@ -12,35 +12,41 @@
 			position: relative;
 		}
 		.overlay {
-			width: 15%;
-			height: 60%;
+			width: 300px;
+			height: 300px;
 			overflow: hidden;
-			/*position: absolute;*/
+			position: relative;
 			border: 2px dotted #ccc;
 		}
 		.overlay img {
-			position: relative;
+			position: absolute;
 			left: 0;
 		}
-
+		.dp-n {
+			display: none;
+		}
 	</style>
 </head>
 <body>
+<div>
+	<input type="text" id='username'>
+	<input type="text" id='password'>
+	<button id='regist'>注册</button>
+</div>
 	<div class="container">
 		<div class="overlay">
 			<img src="123.jpg" alt="原图" class="resize-crop" draggable="false">
 		</div>
 	</div>
-	<button class="crop">裁剪</button>
+	<button class="crop">调整</button>
+	<button class="upload">上传</button>
 	<div class="preview">
 		<img src="" alt="" class="created_img">
 	</div>
 	<script>
-		$('.resize-crop').wrap('<div class="resize-container"></div>');
 		$('.resize-crop').on('mouseenter',function(e){
 			this.style.cursor = "move";
 		})
-
 		var crop_left = getStyle($('.resize-crop')[0],'left'),//裁剪起始点
 			crop_top = getStyle($('.resize-crop')[0],'top');
 		$('.resize-crop').on('mousedown',function(e){
@@ -64,7 +70,7 @@
 					this.style.top = this.parentNode.offsetHeight - this.offsetHeight+'px'
 				}
 			})
-			$('.resize-crop').on('mouseup',function(){
+			$('.resize-crop').on('mouseup mouseleave',function(){
 				crop_left = getStyle(this,'left');
 				crop_top = getStyle(this,'top');
 				$('.resize-crop').off('mousemove')
@@ -83,16 +89,13 @@
 			//获取容器的宽高
 			width = $('.overlay').width();
 			height = $('.overlay').height();
-			var dataImg = cxt1.getImageData(crop_left,crop_top,width,height)//得到裁剪的图片
+			var dataImg = cxt1.getImageData(-crop_left,-crop_top,width,height)//得到裁剪的图片
 			var canvas2 = document.createElement('canvas');
 			canvas2.width = width;
 			canvas2.height = height;
 			var cxt2 = canvas2.getContext('2d');
 			cxt2.putImageData(dataImg,0,0,0,0,width,height);
 			var created_img = canvas2.toDataURL("image/png");
-			console.log(dataImg)
-			console.log(created_img)
-			// $('.preview').append(canvas2)
 			$('.created_img').attr('src',created_img)
 		}
 		function getStyle(dom,attr){
@@ -104,10 +107,53 @@
 		}
 		$('.crop').on('click',crop)
 
+		$('.upload').on('click',function(){
+			var imgData = $('.created_img').attr('src');
+			var formData = new FormData();
+			formData.append('file',imgData);
+			$.ajax({
+				url:'/uploadAvatar',
+				data: formData,
+				type: 'POST',
+				processData: false,
+				contentType: false,
+				success: function(data){
+					// console.log(data)
+				},
+				error: function(err){
+					// console.log(err)
+				} 
+			})
+		})
 
-
-
-
+		var regist = function(){
+			var data = {};
+			var username = $('#username').val(),
+				pwd = $('#password').val();
+			if(username){
+				data.username = username;
+			}else {
+				return false;
+			}
+			if(pwd){
+				data.password = pwd;
+			}else {
+				return false
+			}
+			if(Object.keys(data).length>0){
+				$.ajax({
+					url:'regist',
+					data: data,
+					type:'POST',
+					dataType:'json',
+				}).done(function(data){
+					console.log(data)
+				}).fail(function(){
+					$('#regist').one('click',regist);
+				})
+			}
+		}
+		$('#regist').one('click',regist);
 
 
 	</script>
