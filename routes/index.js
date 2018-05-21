@@ -1,5 +1,6 @@
 var router = require('express').Router();
 var fs = require('fs');
+var util = require('util');
 var multiparty = require('multiparty');
 
 var userDao = require('../dao/userDao.js');
@@ -15,8 +16,11 @@ var userDao = require('../dao/userDao.js');
 // 	}
 // })
 // var upload = multer({storage:storage});
-router.get('/',function(){
+router.get('/',function(req,res){
 	res.render('index')
+})
+router.get("/test",function(req,res){
+	res.render("test")
 })
 router.get('/123',function(req,res){
 	res.writeHead(200,{'Content-Type':'image/jpeg'})
@@ -33,6 +37,7 @@ router.get('/123',function(req,res){
 router.post('/uploadAvatar',function(req,res){
 	var form = new multiparty.Form();
 	form.parse(req,function(err,fields,files){
+		console.log(files)
 		var imgData = fields.file[0].replace(/^data:image\/\w+;base64,/,'');
 		var dataBuffer = new Buffer(imgData,'base64');
 		//写入文件
@@ -44,9 +49,34 @@ router.post('/uploadAvatar',function(req,res){
 			}
 		})
 	})
-	res.send({ret_code:'0'})
 })
+router.post('/uploadImage',function(req,res){
+    var form = new multiparty.Form();
+    form.parse(req,function(err,fields,files){
+		if(err){
+    		res.json({
+    			statusCode:err.statusCode,
+    			message:err.toString()
+    		})
+		}else {
+            var imageUrl = [],
+				_files = files['file'];
 
+			if(_files){
+				_files.forEach(function(file,i){
+					// 使用文件流输入输出，跨分区重命名
+					var is = fs.createReadStream(file.path);
+					var os = fs.createWriteStream('upload/'+file.originalFilename);
+					is.pipe(os);
+					imageUrl.push('upload/'+file.originalFilename)
+					if(i===_files.length-1){
+	                    res.json({statusCode:0,message:'ok',imageUrl:imageUrl})
+					}
+				})
+			}
+		}
+    })
+})
 router.post('/regist',function(req,res,next){
 	userDao.regist(req,res,next);
 })

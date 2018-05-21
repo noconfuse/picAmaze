@@ -27,8 +27,12 @@ var path  = require('path');
 
 //指定静态资源访问目录
 app.use(express.static(path.join(__dirname,'public')));
+app.use(express.static(path.join(__dirname,'lib')));
+app.use(express.static(path.join(__dirname,'upload')));
 app.use(bodyParser.urlencoded({extended:false}));
 app.set('views',(__dirname + "/public"));
+
+app.engine('html',require('ejs').__express)
 app.set('view engine','html');
 
 app.use('/',require('./routes'))

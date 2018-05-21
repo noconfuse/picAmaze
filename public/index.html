@@ -3,12 +3,14 @@
 <head>
 	<meta charset="UTF-8">
 	<title>canvas裁剪图片</title>
+	<link rel="stylesheet" href="dropzone/basic.min.css">
+	<link rel="stylesheet" href="dropzone/dropzone.min.css">
 	<script src="https://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
+	<script type="text/javascript" src="dropzone/dropzone.min.js"></script>
 	<style>
 		.container {
 			width: 60%;
 			margin: 0 auto;
-			height: ;
 			position: relative;
 		}
 		.overlay {
@@ -24,6 +26,10 @@
 		}
 		.dp-n {
 			display: none;
+		}
+		#my-dropzone {
+			height: 300px;
+			border: 2px dashed #39c;
 		}
 	</style>
 </head>
@@ -43,119 +49,57 @@
 	<div class="preview">
 		<img src="" alt="" class="created_img">
 	</div>
-	<script>
-		$('.resize-crop').on('mouseenter',function(e){
-			this.style.cursor = "move";
-		})
-		var crop_left = getStyle($('.resize-crop')[0],'left'),//裁剪起始点
-			crop_top = getStyle($('.resize-crop')[0],'top');
-		$('.resize-crop').on('mousedown',function(e){
-			var startPoint_x = e.clientX;
-			var startPoint_y = e.clientY;
-			var numL = parseInt(window.getComputedStyle(this,null)['left']);
-			var numT = parseInt(window.getComputedStyle(this,null)['top']);
-			$('.resize-crop').on('mousemove',function(e){
-				this.style.left = numL + e.clientX - startPoint_x+"px";
-				this.style.top = numT + e.clientY - startPoint_y+"px";
-				var num1   = parseInt(this.style.left);
-				if(num1 >= 0){
-					this.style.left = 0
-				}else if(num1 <=  this.parentNode.offsetWidth - this.offsetWidth){
-					this.style.left = this.parentNode.offsetWidth - this.offsetWidth+'px'
-				}
-				var num2 = parseInt(this.style.top);
-				if(num2 >= 0){
-					this.style.top = 0
-				}else if(num2 <=  this.parentNode.offsetHeight - this.offsetHeight){
-					this.style.top = this.parentNode.offsetHeight - this.offsetHeight+'px'
-				}
-			})
-			$('.resize-crop').on('mouseup mouseleave',function(){
-				crop_left = getStyle(this,'left');
-				crop_top = getStyle(this,'top');
-				$('.resize-crop').off('mousemove')
-			})
-		})
-		var canvas1 = document.createElement('canvas');
-		var cxt1 = canvas1.getContext('2d');
-		var img = new Image();
-		img.src = $('.resize-crop').attr('src');
-		img.onload = function(){
-			canvas1.width = $('.resize-crop').width();
-			canvas1.height = $('.resize-crop').height();
-			cxt1.drawImage(img,0,0);
-		}
-		function crop(){
-			//获取容器的宽高
-			width = $('.overlay').width();
-			height = $('.overlay').height();
-			var dataImg = cxt1.getImageData(-crop_left,-crop_top,width,height)//得到裁剪的图片
-			var canvas2 = document.createElement('canvas');
-			canvas2.width = width;
-			canvas2.height = height;
-			var cxt2 = canvas2.getContext('2d');
-			cxt2.putImageData(dataImg,0,0,0,0,width,height);
-			var created_img = canvas2.toDataURL("image/png");
-			$('.created_img').attr('src',created_img)
-		}
-		function getStyle(dom,attr){
-			if(document.currentStyle){
-				return parseInt(dom.currentStyle.attr)
-			}else if(window.getComputedStyle){
-				return parseInt(window.getComputedStyle(dom,null)[attr])
-			}
-		}
-		$('.crop').on('click',crop)
 
-		$('.upload').on('click',function(){
-			var imgData = $('.created_img').attr('src');
-			var formData = new FormData();
-			formData.append('file',imgData);
-			$.ajax({
-				url:'/uploadAvatar',
-				data: formData,
-				type: 'POST',
-				processData: false,
-				contentType: false,
-				success: function(data){
-					// console.log(data)
-				},
-				error: function(err){
-					// console.log(err)
-				} 
-			})
-		})
-
-		var regist = function(){
-			var data = {};
-			var username = $('#username').val(),
-				pwd = $('#password').val();
-			if(username){
-				data.username = username;
-			}else {
-				return false;
-			}
-			if(pwd){
-				data.password = pwd;
-			}else {
-				return false
-			}
-			if(Object.keys(data).length>0){
-				$.ajax({
-					url:'regist',
-					data: data,
-					type:'POST',
-					dataType:'json',
-				}).done(function(data){
-					console.log(data)
-				}).fail(function(){
-					$('#regist').one('click',regist);
-				})
-			}
-		}
-		$('#regist').one('click',regist);
+	<form action="/uploadImage" method="post" class="dropzone" id="my-dropzone">
+		<div class="dropzone-previews"></div>
+		<button type="submit" id="i_upload">立即上传</button>
+	</form>
 
 
+	<script type="text/javascript" src="javascript/dragincontainer.js">
 	</script>
+<script>
+    Dropzone.options.myDropzone = {
+		maxFiles: 10,
+        paramName:'file',
+        uploadMultiple:true,
+        addRemoveLinks:true,
+        dictDefaultMessage: '图片拖放到这里上传！',
+		dictRemoveFile:'x',
+        dictCancelUpload:'x',
+		thumbnailWidth:'150px',
+		thumbnailMethod:'contain',
+		acceptFiles:'image/jpeg',
+		autoProcessQueue:false,
+		accept: function(file,done){
+		    if(/[\.jpg|\.png|\.jpeg|\.gif]$/.test(file.name)){
+                done();
+			}else {
+		        done('不支持此文件格式！');
+			}
+		},
+		init: function(){
+            myDropzone = this;
+			$('#i_upload').on('click',function(e){
+                e.preventDefault();
+                e.stopPropagation();
+                myDropzone.processQueue()
+			})
+			this.on("success",function(file,serverResponse){
+                if(!file.type.match(/image.*/)){
+                    this.emit('thumbnail',file,serverResponse.imageUrl[0]);
+                    this.createThumbnailFromUrl(file, serverResponse.imageUrl[0]);
+                }
+			})
+			this.on("successmultiple",function(fileList){
+				console.log(fileList)
+			})
+		}
+    };
+    Dropzone.confirm = function(question,accepted,rejected){
+
+	}
+
+</script>
 </body>
 </html>

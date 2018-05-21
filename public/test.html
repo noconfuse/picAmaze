@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>	test</title>
+</head>
+<body>
+	<input type="file" id="selectFile" multiple>
+	<button id="upload">上传</button>
+	<p id="progress"></p>
+</body>
+		<script>	
+			var filelist = null;
+			selectFile.onchange = function(e){
+				filelist = e.target.files
+			}	
+			//原生方法
+			upload.onclick = function(){
+				uploadFile()
+			}
+			function uploadFile(){
+				var xhr = new XMLHttpRequest();
+				xhr.open("POST",'/uploadImage');//异步发送请求
+				var fd = new FormData();
+
+				if(filelist&&filelist.length>0){
+					for(var i =0;i<filelist.length;i++){
+						fd.append('file',filelist[i])
+					}
+					fd.append("name",'baolei')
+				}
+				xhr.onprogress = function(e){
+					console.log(e)
+				}
+				xhr.upload.addEventListener("progress",function(e){
+					console.log(e)
+					if(e.lengthComputable){
+						progress.innerText = 100*e.loaded/e.total + "% Complete"
+					}
+				},false)
+				
+				xhr.onreadystatechange = function(){
+					if(xhr.readyState===4&&xhr.status===200) {
+						console.log(xhr.responseText)
+					}
+				}
+				xhr.send(fd)
+			}
+
+		</script>
+</html>
