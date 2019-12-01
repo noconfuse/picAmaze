@@ -1,104 +1,292 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<meta charset="UTF-8">
+	<meta charset="UTF-8"  name="viewport" content="maximum-scale=1.0,minimum-scale=1.0,user-scalable=0,width=device-width,initial-scale=1.0"/>
 	<title>canvas裁剪图片</title>
-	<link rel="stylesheet" href="dropzone/basic.min.css">
-	<link rel="stylesheet" href="dropzone/dropzone.min.css">
 	<script src="https://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
-	<script type="text/javascript" src="dropzone/dropzone.min.js"></script>
 	<style>
+		html,body{
+			height: 100%;
+		}
+		body{
+			margin: 0;
+			padding: 0;
+		}
 		.container {
-			width: 60%;
-			margin: 0 auto;
+			width: 100%;
+			height: 100%;
+			position: relative;
+			display: flex;
+		}
+
+		.container .overlay{
+			width: 100%;
+			margin: auto;
+		}
+		.overlay img{
+			width: 100%;
 			position: relative;
 		}
-		.overlay {
-			width: 300px;
-			height: 300px;
-			overflow: hidden;
-			position: relative;
-			border: 2px dotted #ccc;
+
+		#cropContainer{
+			width: 100%;
 		}
-		.overlay img {
+		.tabBar{
 			position: absolute;
-			left: 0;
-		}
-		.dp-n {
-			display: none;
-		}
-		#my-dropzone {
-			height: 300px;
-			border: 2px dashed #39c;
+			width: 100%;
+			height: 100px;
+			line-height: 100px;
+			bottom: 0;
+			background-color: rgba(0,0,0,0.1)
 		}
 	</style>
 </head>
 <body>
-<div>
-	<input type="text" id='username'>
-	<input type="text" id='password'>
-	<button id='regist'>注册</button>
-</div>
 	<div class="container">
 		<div class="overlay">
-			<img src="123.jpg" alt="原图" class="resize-crop" draggable="false">
+			<canvas id="cropContainer"></canvas>
+		</div>
+		<div class="tabBar">
+			<span id="cropBtn">
+				裁剪
+			</span>
 		</div>
 	</div>
-	<button class="crop">调整</button>
-	<button class="upload">上传</button>
-	<div class="preview">
-		<img src="" alt="" class="created_img">
-	</div>
-
-	<form action="/uploadImage" method="post" class="dropzone" id="my-dropzone">
-		<div class="dropzone-previews"></div>
-		<button type="submit" id="i_upload">立即上传</button>
-	</form>
-
-
-	<script type="text/javascript" src="javascript/dragincontainer.js">
-	</script>
 <script>
-    Dropzone.options.myDropzone = {
-		maxFiles: 10,
-        paramName:'file',
-        uploadMultiple:true,
-        addRemoveLinks:true,
-        dictDefaultMessage: '图片拖放到这里上传！',
-		dictRemoveFile:'x',
-        dictCancelUpload:'x',
-		thumbnailWidth:'150px',
-		thumbnailMethod:'contain',
-		acceptFiles:'image/jpeg',
-		autoProcessQueue:false,
-		accept: function(file,done){
-		    if(/[\.jpg|\.png|\.jpeg|\.gif]$/.test(file.name)){
-                done();
-			}else {
-		        done('不支持此文件格式！');
-			}
-		},
-		init: function(){
-            myDropzone = this;
-			$('#i_upload').on('click',function(e){
-                e.preventDefault();
-                e.stopPropagation();
-                myDropzone.processQueue()
-			})
-			this.on("success",function(file,serverResponse){
-                if(!file.type.match(/image.*/)){
-                    this.emit('thumbnail',file,serverResponse.imageUrl[0]);
-                    this.createThumbnailFromUrl(file, serverResponse.imageUrl[0]);
-                }
-			})
-			this.on("successmultiple",function(fileList){
-				console.log(fileList)
-			})
-		}
-    };
-    Dropzone.confirm = function(question,accepted,rejected){
+	/*
+		一个图片处理工具类，需要共享的对象：图片、图片属性、canvas、context、裁剪坐标、裁剪边框属性
+	*/
 
+
+
+
+
+	let canvas = document.getElementById('cropContainer');
+	let context = canvas.getContext('2d');
+	//裁剪框初始属性，lineWidth:4 x:10 y:10 width:300 height:300
+
+	const clipAttr = (function(o){
+		//一些计算属性,只读
+		Object.defineProperties(o,{
+			clipWidth:{
+				get(){
+					return o.xx-o.x
+				}
+			},
+			clipHeight:{
+				get(){
+					return o.yy - o.y
+				}
+			},
+			mapImgX:{//裁剪坐标映射在图片中的相对位置
+				get(){
+					return o.x*imgCanvasRate
+				}
+			},
+			mapImgY:{
+				get(){
+					return o.y*imgCanvasRate
+				}
+			},
+			mapImgWidth:{
+				get(){
+					return o.clipWidth*imgCanvasRate
+				}
+			},
+			mapImgHeight:{
+				get(){
+					return o.clipHeight*imgCanvasRate
+				}
+			}
+		})
+		return o
+	})({
+		x:10,
+		y:10,
+		xx:310,
+		yy:310
+	})
+
+
+	let cropX = 10;
+	let cropY = 10;
+	// let cropWidth = 300;
+	// let cropHeight = 300;
+	let cropLineWidth = 6;
+	let imgHWScale = 0;
+	let canvasWidth = window.innerWidth ,canvasHeight;
+	let imgCanvasRate = 0;
+
+
+	loadImg('./456.jpg',function(image){
+		//初始化一些属性
+		imgHWScale = image.height/image.width;
+		imgCanvasRate = image.width/canvasWidth;
+		canvasHeight = canvasWidth*image.height/image.width;
+
+		canvas.width = canvasWidth;
+		canvas.height = canvasHeight;
+		canvas.style.backgroundImage = 'url(./456.jpg)';
+		canvas.style.backgroundSize = 'cover'
+		//绘制裁剪蒙版
+		context.fillStyle = 'rgba(255,255,255,0.7)'
+		context.fillRect(0, 0, canvasWidth, canvasHeight);
+		//绘制裁剪边框
+		context.beginPath();
+		context.lineWidth = cropLineWidth;
+		context.strokeStyle = '#000000';
+		let {x,y,clipWidth,clipHeight} = clipAttr;
+		context.rect(x,y,clipWidth,clipHeight);
+		context.stroke();
+		context.globalCompositeOperation = "destination-out"
+		context.fill();
+		//添加拖动放大缩小裁剪框事件
+
+		//添加裁剪事件
+		const cropBtn = document.getElementById('cropBtn')
+		cropBtn.onclick = function(){
+			context.globalCompositeOperation = "source-over";
+			canvas.style.backgroundImage = 'none'
+			console.log('图片的宽度 %s',image.width)
+			const {
+				mapImgX,mapImgY,mapImgWidth,mapImgHeight
+			} = clipAttr;
+			canvas.height = canvasHeight = canvasWidth*mapImgHeight/mapImgWidth;
+			context.drawImage(image,mapImgX,mapImgY,mapImgWidth,mapImgHeight, 0,0,canvasWidth,canvasHeight);
+		}
+	})
+
+	let startX,startY;
+	let leftActive = topActive = rightActive = bottomActive = leftTopActive = rightTopActive = leftBottomActive = rightBottomActive = false;
+	let hotOffset  = 10//热区控制，偏差10
+	canvas.addEventListener('touchstart',function(event){
+		//判断触摸区域，如果触摸在裁剪框，缩放裁剪框大小，如果在图片上，拖动图片位置
+		let touchEnv = event.touches[0];
+		startX = touchEnv.pageX;
+		startY = touchEnv.pageY;
+		let disX = startX - canvas.offsetLeft;
+		let disY = startY-canvas.offsetTop;
+		
+		const {x,y,xx,yy} = clipAttr;
+
+
+		if(disY > y + hotOffset && disY < yy - hotOffset){
+			if(Math.abs(disX-x) < hotOffset){
+				console.log('选中了左边边框')
+				leftActive = true;
+			}
+			if(Math.abs(disX-xx)<hotOffset){
+				console.log("选中了右边框")
+				rightActive = true
+			}
+		}
+
+		if(disX > x + hotOffset && disX <xx-hotOffset){
+			if(Math.abs(disY-y) < hotOffset){
+				console.log("选中的上边框")
+				topActive = true;
+			}
+			if(Math.abs(disY-yy)<hotOffset){
+				console.log("选中下边框");
+				bottomActive = true
+			}
+		}
+		if(Math.abs(disY-y)<hotOffset && Math.abs(disX-x)<hotOffset){
+			console.log('左上角')
+			leftTopActive = true
+		}
+		if(Math.abs(disY-y)<hotOffset && Math.abs(disX-xx)<hotOffset){
+			console.log('右上角')
+			rightTopActive = true
+		}
+		if(Math.abs(disY-yy)<hotOffset&&Math.abs(disX-x)<hotOffset){
+			console.log('左下角')
+			leftBottomActive = true
+		}
+		if(Math.abs(disX-xx)<hotOffset&&Math.abs(disY-yy)<hotOffset){
+			console.log('右下角')
+			rightBottomActive = true
+		}
+	},false)
+
+
+	//移动中裁剪框的位置
+	let currentClipAttr = Object.assign({},clipAttr)
+
+	canvas.addEventListener('touchmove',function(event){
+		//这里禁止浏览器的默认事件
+		event.preventDefault();
+		let touchEnv = event.touches[0];
+		//触摸移动距离
+		let offX = touchEnv.pageX - startX;
+		let offY = touchEnv.pageY - startY;
+		const {x,y,xx,yy} = clipAttr;
+		//todo 逻辑优化
+		if(leftActive){
+			//限制一下拖动范围
+			reDraw(x + offX, y, xx,yy)
+		}
+		if(rightActive){
+			reDraw(x, y, xx+offX,yy)
+		}
+		if(topActive){
+			reDraw(x,y+offY,xx,yy)
+		}
+		if(bottomActive){
+			reDraw(x,y,xx,yy+offY)
+		}
+		if(leftTopActive){
+			reDraw(x+offX,y+offY,xx,yy)
+		}
+		if(rightTopActive){
+			reDraw(x,y+offY,xx+offX,yy)
+		}
+		if(leftBottomActive){
+			reDraw(x+offX,y,xx,yy+offY)
+		}
+		if(rightBottomActive){
+			reDraw(x,y,xx+offX,yy+offY)
+		}
+	},false)
+
+	//重新绘制裁剪框
+	function reDraw(x, y, xx, yy){
+		//重新绘制  
+		context.clearRect(0, 0, canvasWidth, canvasHeight)
+		context.globalCompositeOperation = "source-over";
+		context.fillStyle = 'rgba(255,255,255,0.7)';
+		context.fillRect(0, 0, canvasWidth, canvasHeight);
+		//绘制裁剪边框
+		context.beginPath();
+		context.lineWidth = cropLineWidth;
+		context.strokeStyle = '#000000';
+		context.rect(x, y, xx-x, yy-y);
+		context.stroke();
+		context.globalCompositeOperation = "destination-out";
+		context.fill();
+		currentClipAttr.x =x
+		currentClipAttr.xx =xx
+		currentClipAttr.y =y
+		currentClipAttr.yy =yy
 	}
+
+	canvas.addEventListener('touchend',function(event){
+		leftActive = topActive = rightActive = bottomActive = leftTopActive = rightTopActive = leftBottomActive = rightBottomActive = false;
+		//记录下裁剪框的位置，便于后续裁剪图片
+		clipAttr.x = currentClipAttr.x;
+		clipAttr.xx = currentClipAttr.xx;
+		clipAttr.y = currentClipAttr.y;
+		clipAttr.yy = currentClipAttr.yy;
+	},false)
+
+	function loadImg(src,cb){
+		var img = new Image();
+		img.src = src ;
+		img.onload = function(){
+			typeof cb === 'function'&&cb(img)
+		}
+	}
+
 
 </script>
 </body>
