@@ -54,13 +54,37 @@
 	</div>
 <script>
 	/*
+		一些工具
+	*/
+	// 取浏览器的 CSS 前缀
+	var prefix = function() {
+		var styles = window.getComputedStyle(document.documentElement, '');
+		console.log(styles.OLink)
+		var core = (
+			Array.prototype.slice
+			.call(styles)
+			.join('')
+			.match(/-(moz|webkit|ms)-/) || (styles.OLink === '' && ['', 'o'])
+		)[1];
+		return core;
+	}();
+
+	window.requestAnimFrame = (function() {
+		return (
+			window.requestAnimationFrame ||
+			window.webkitRequestAnimationFrame ||
+			window.mozRequestAnimationFrame ||
+			window.oRequestAnimationFrame ||
+			window.msRequestAnimationFrame ||
+			function(callback, element) {
+				window.setTimeout(callback, 1000 / 60)
+			}
+		)
+	})()
+
+	/*
 		一个图片处理工具类，需要共享的对象：图片、图片属性、canvas、context、裁剪坐标、裁剪边框属性
 	*/
-
-
-
-
-
 	let canvas = document.getElementById('cropContainer');
 	let context = canvas.getContext('2d');
 	//裁剪框初始属性，lineWidth:4 x:10 y:10 width:300 height:300
@@ -112,7 +136,7 @@
 	let cropY = 10;
 	// let cropWidth = 300;
 	// let cropHeight = 300;
-	let cropLineWidth = 6;
+	let cropLineWidth = 4;
 	let imgHWScale = 0;
 	let canvasWidth = window.innerWidth ,canvasHeight;
 	let imgCanvasRate = 0;
@@ -127,7 +151,8 @@
 		canvas.width = canvasWidth;
 		canvas.height = canvasHeight;
 		canvas.style.backgroundImage = 'url(./456.jpg)';
-		canvas.style.backgroundSize = 'cover'
+		canvas.style.backgroundSize = 'cover';
+		canvas.style.backgroundRepeat = 'no-repeat';
 		//绘制裁剪蒙版
 		context.fillStyle = 'rgba(255,255,255,0.7)'
 		context.fillRect(0, 0, canvasWidth, canvasHeight);
@@ -159,6 +184,7 @@
 	let startX,startY;
 	let leftActive = topActive = rightActive = bottomActive = leftTopActive = rightTopActive = leftBottomActive = rightBottomActive = false;
 	let hotOffset  = 10//热区控制，偏差10
+	let origBgX,origBgY;
 	canvas.addEventListener('touchstart',function(event){
 		//判断触摸区域，如果触摸在裁剪框，缩放裁剪框大小，如果在图片上，拖动图片位置
 		let touchEnv = event.touches[0];
@@ -166,10 +192,7 @@
 		startY = touchEnv.pageY;
 		let disX = startX - canvas.offsetLeft;
 		let disY = startY-canvas.offsetTop;
-		
 		const {x,y,xx,yy} = clipAttr;
-
-
 		if(disY > y + hotOffset && disY < yy - hotOffset){
 			if(Math.abs(disX-x) < hotOffset){
 				console.log('选中了左边边框')
@@ -177,7 +200,7 @@
 			}
 			if(Math.abs(disX-xx)<hotOffset){
 				console.log("选中了右边框")
-				rightActive = true
+				rightActive = true;
 			}
 		}
 
@@ -188,25 +211,27 @@
 			}
 			if(Math.abs(disY-yy)<hotOffset){
 				console.log("选中下边框");
-				bottomActive = true
+				bottomActive = true;
 			}
 		}
 		if(Math.abs(disY-y)<hotOffset && Math.abs(disX-x)<hotOffset){
 			console.log('左上角')
-			leftTopActive = true
+			leftTopActive = true;
 		}
 		if(Math.abs(disY-y)<hotOffset && Math.abs(disX-xx)<hotOffset){
 			console.log('右上角')
-			rightTopActive = true
+			rightTopActive = true;
 		}
 		if(Math.abs(disY-yy)<hotOffset&&Math.abs(disX-x)<hotOffset){
 			console.log('左下角')
-			leftBottomActive = true
+			leftBottomActive = true;
 		}
 		if(Math.abs(disX-xx)<hotOffset&&Math.abs(disY-yy)<hotOffset){
 			console.log('右下角')
 			rightBottomActive = true
 		}
+		origBgX = parseFloat(canvas.style.backgroundPositionX)
+		origBgY = parseFloat(canvas.style.backgroundPositionY)
 	},false)
 
 
@@ -217,6 +242,7 @@
 		//这里禁止浏览器的默认事件
 		event.preventDefault();
 		let touchEnv = event.touches[0];
+		
 		//触摸移动距离
 		let offX = touchEnv.pageX - startX;
 		let offY = touchEnv.pageY - startY;
@@ -224,33 +250,46 @@
 		//todo 逻辑优化
 		if(leftActive){
 			//限制一下拖动范围
-			reDraw(x + offX, y, xx,yy)
+			reDraw(x + offX, y, xx,yy);
+			return;
 		}
 		if(rightActive){
-			reDraw(x, y, xx+offX,yy)
+			reDraw(x, y, xx+offX,yy);
+			return
 		}
 		if(topActive){
-			reDraw(x,y+offY,xx,yy)
+			reDraw(x,y+offY,xx,yy);
+			return;
 		}
 		if(bottomActive){
 			reDraw(x,y,xx,yy+offY)
+			return
 		}
 		if(leftTopActive){
 			reDraw(x+offX,y+offY,xx,yy)
+			return
 		}
 		if(rightTopActive){
 			reDraw(x,y+offY,xx+offX,yy)
+			return
 		}
 		if(leftBottomActive){
 			reDraw(x+offX,y,xx,yy+offY)
+			return
 		}
 		if(rightBottomActive){
 			reDraw(x,y,xx+offX,yy+offY)
+			return
 		}
+		moveBg(offX,offY)
 	},false)
 
 	//重新绘制裁剪框
 	function reDraw(x, y, xx, yy){
+		x=x<0?0:x;
+		y=y<0?0:y;
+		xx =xx>canvasWidth?canvasWidth:xx;
+		yy = yy>canvasHeight?canvasHeight:yy;
 		//重新绘制  
 		context.clearRect(0, 0, canvasWidth, canvasHeight)
 		context.globalCompositeOperation = "source-over";
@@ -258,7 +297,7 @@
 		context.fillRect(0, 0, canvasWidth, canvasHeight);
 		//绘制裁剪边框
 		context.beginPath();
-		context.lineWidth = cropLineWidth;
+		// context.lineWidth = cropLineWidth;
 		context.strokeStyle = '#000000';
 		context.rect(x, y, xx-x, yy-y);
 		context.stroke();
@@ -270,6 +309,39 @@
 		currentClipAttr.yy =yy
 	}
 
+	//移动背景图
+	function moveBg(offX,offY){
+		canvas.style.backgroundPositionX = origBgX + offX + 'px'
+		canvas.style.backgroundPositionY = origBgY + offY + 'px'
+	}
+
+	//背景图移位动画
+	function transitionBg({x=0,y=0},time){
+		let nowX = parseFloat(canvas.style.backgroundPositionX);
+		let nowY = parseFloat(canvas.style.backgroundPositionY);
+		let totalCount = parseInt(time/60)//次数
+		let stepX = 
+		(x-nowX)/totalCount;
+		let stepY = (y-nowY)/totalCount;
+		let count = 0
+		let loopAnimate = function(){
+			count++;
+			if(count===totalCount){
+				canvas.style.backgroundPositionX = x + 'px';
+				canvas.style.backgroundPositionY = y +'px';
+				return;
+			}
+			canvas.style.backgroundPositionX = nowX+ stepX*count + 'px';
+			canvas.style.backgroundPositionY = nowY+ stepY*count +'px';
+			requestAnimFrame(loopAnimate)
+		}
+		loopAnimate()
+	}
+
+	
+
+
+
 	canvas.addEventListener('touchend',function(event){
 		leftActive = topActive = rightActive = bottomActive = leftTopActive = rightTopActive = leftBottomActive = rightBottomActive = false;
 		//记录下裁剪框的位置，便于后续裁剪图片
@@ -277,6 +349,24 @@
 		clipAttr.xx = currentClipAttr.xx;
 		clipAttr.y = currentClipAttr.y;
 		clipAttr.yy = currentClipAttr.yy;
+
+		let bgPosX = parseFloat(canvas.style.backgroundPositionX);
+		let bgPosY = parseFloat(canvas.style.backgroundPositionY);
+		let targetX,targetY;
+		if(bgPosX > clipAttr.x){
+			targetX = clipAttr.x
+		}
+		if(bgPosY > clipAttr.y){
+			targetY = clipAttr.y
+		}
+		if(bgPosX < clipAttr.xx - canvasWidth){
+			targetX = clipAttr.xx - canvasWidth;
+		}
+		console.log(bgPosY,clipAttr.yy-canvasHeight)
+		if(bgPosY < clipAttr.yy - canvasHeight){
+			targetY = clipAttr.yy - canvasHeight;
+		}
+		transitionBg({x: targetX,y: targetY}, 500)
 	},false)
 
 	function loadImg(src,cb){
